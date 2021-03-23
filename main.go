@@ -6,12 +6,13 @@ import (
 	"log"
 	"os"
 	"plugin"
+	"strings"
 
 	"github.com/sourcegraph/go-diff/diff"
 )
 
 type Greeter interface {
-	Greet()
+	Greet(diff.FileDiff)
 }
 
 func patch_parsed_hook(d diff.FileDiff) {
@@ -31,9 +32,17 @@ func patch_parsed_hook(d diff.FileDiff) {
 		log.Fatal(err)
 	}
 
+	/* For each plugin file */
 	for _, f := range files {
-		fmt.Println(f.Name())
-		plug, err := plugin.Open("./plugins/" + f.Name())
+		var name = f.Name()
+
+		if !strings.HasSuffix(name, ".so") {
+			continue
+		}
+
+		log.Println("Found plugin", name)
+
+		plug, err := plugin.Open("./plugins/" + name)
 		symGreeter, err := plug.Lookup("Greeter")
 
 		if err != nil {
@@ -49,7 +58,7 @@ func patch_parsed_hook(d diff.FileDiff) {
 			os.Exit(1)
 		}
 
-		greeter.Greet()
+		greeter.Greet(d)
 	}
 
 }
