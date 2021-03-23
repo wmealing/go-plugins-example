@@ -1,13 +1,79 @@
 package main
 
 import (
-	"github.com/fengyoulin/hookingo"
+	"fmt"
+	"io/ioutil"
 	"log"
+	"os"
+	"plugin"
 
+	"github.com/sourcegraph/go-diff/diff"
 )
 
-func main() {
-	log.Println("Starting")
-	log.Println("Ending")
+type Greeter interface {
+	Greet()
+}
 
+func patch_parsed_hook(d diff.FileDiff) {
+
+	/* There will be an observer hook here here to loop through
+	   and msg all observers */
+
+	log.Println("👌 - Running Patch parsed hooks.")
+	log.Println("🛈 D = ", d)
+
+	/* This is a long dance, that reads the compiled so files
+	   in plugins */
+
+	files, err := ioutil.ReadDir("./plugins/")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, f := range files {
+		fmt.Println(f.Name())
+		plug, err := plugin.Open("./plugins/" + f.Name())
+		symGreeter, err := plug.Lookup("Greeter")
+
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		var greeter Greeter
+		greeter, ok := symGreeter.(Greeter)
+
+		if !ok {
+			fmt.Println("unexpected type from module symbol")
+			os.Exit(1)
+		}
+
+		greeter.Greet()
+	}
+
+}
+
+func parse_patch(p string) {
+	log.Println("🛈 - Parsing patch file:", p)
+
+	diffData, err := ioutil.ReadFile("test.diff")
+
+	if err != nil {
+		log.Println("ERROR")
+	}
+
+	diff, err := diff.ParseFileDiff(diffData)
+
+	if err != nil {
+		log.Printf("🛈 - %s: parseHunks err %v, want %v", p, err, nil)
+	}
+
+	patch_parsed_hook(*diff)
+}
+
+func main() {
+	log.Println("🛈 - Starting")
+	parse_patch("test.diff")
+	log.Println("🛈 - Ending")
 }
